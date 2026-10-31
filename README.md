@@ -35,6 +35,23 @@ The demo tunes on 300 simulated strategies (seed 1), evaluates on 300 independen
 strategies (seed 2), then reports the first alarm on the original demo strategy.
 It uses synthetic data and needs no downloaded market data.
 
+Verified with the committed lockfile: **17 tests passed**. The demo reproduced
+CUSUM's upstream results:
+
+| Output | Value |
+|---|---:|
+| Training-selected threshold | 4.0 |
+| First demo alarm (zero-based day) | 550 |
+| True demo break (zero-based day) | 450 |
+| Test mean regret | 15.8583% of starting capital |
+| Standard error of test mean regret | 0.9143 percentage points |
+| Test false kills | 93 / 300 strategies |
+| Test missed breaks | 28 / 200 broken strategies |
+| Mean delay among detected test breaks | 68.1163 days |
+
+The demo path's delay (100 days) differs from the average delay across the test
+set. Small numerical differences can occur with different dependency versions.
+
 A minimal example, after installing dependencies:
 
 ```python
