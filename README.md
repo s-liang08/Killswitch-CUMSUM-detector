@@ -1,4 +1,6 @@
-# CUSUM detector for strategy deterioration
+# Killswitch - CUMSUM detector
+
+**Original team project:** [Killswitch](https://github.com/leilei67/Killswitch)
 
 A focused extraction and mathematical walkthrough of the CUSUM detector in
 [Killswitch](https://github.com/leilei67/Killswitch), a team project that asks
