@@ -7,9 +7,8 @@ A focused extraction and mathematical walkthrough of the CUSUM detector in
 whether a trading strategy has broken or is experiencing a bad run.
 
 This repository documents part of our collaborative work. **Other members of
-the team are Leiyi Sun and Zijian Wang.** The original implementation is team
-work; this standalone presentation does not claim sole authorship or assign
-individual contributions that have not been verified.
+the team are Leiyi Sun and Zijian Wang.** The original implementation was
+developed as a team project.
 
 The detector accumulates evidence for a change from a healthy positive return
 mean to a negative mean. It combines a Student-t return model with a one-sided
@@ -52,7 +51,7 @@ CUSUM's upstream results:
 | Mean delay among detected test breaks | 68.1163 days |
 
 The demo path's delay (100 days) differs from the average delay across the test
-set. Small numerical differences can occur with different dependency versions.
+set.
 
 A minimal example, after installing dependencies:
 
@@ -64,17 +63,18 @@ print(s)                         # [1.  0.5 0.  2. ]
 print(Cusum().fires(s, 2.0))      # all False: the comparison is strictly >
 ```
 
-Here the inputs are **log-likelihood ratios**, not returns. To convert returns:
+Here the inputs are **log-likelihood ratios**. This complete example converts
+simulated daily returns into the detector statistic:
 
 ```python
 from core.model import fit_baseline, log_likelihood_ratio
 from core.detectors import cusum
+from core.sim import demo_strategy
 
-# returns is a one-dimensional array of daily decimal returns (1% = 0.01).
+returns = demo_strategy()  # Daily decimal returns: 1% = 0.01.
 base = fit_baseline(returns[:250])
-if base.mu <= 0:
-    raise ValueError("This positive-edge deterioration model needs a positive baseline mean")
 s = cusum(log_likelihood_ratio(returns[250:], base))
+print(s[:5])
 ```
 
 Fit the baseline on the initial period only. The detector starts from zero on
@@ -84,30 +84,29 @@ the first monitored day, after the 250-day warm-up.
 
 Let $r_t$ be a daily return. Under the healthy model,
 
-$$
+```math
 H_0:\quad r_t=\mu+\sigma Z_t,\qquad Z_t\sim t_\nu.
-$$
+```
 
 Under the broken model,
 
-$$
+```math
 H_1:\quad r_t=\mu_b+\sigma Z_t,\qquad \mu_b=-k|\mu|,\quad k=1.
-$$
+```
 
 The two models share scale $\sigma$ and degrees of freedom $\nu$; only location
-changes. We require a positive healthy mean for this interpretation.
-For $k=1$ and $\mu\leq0$, the two locations coincide, so there is no detectable
-change under these hypotheses.
+changes. The healthy baseline has $\mu>0$, so the default alternative has
+$\mu_b=-\mu$.
 
 The Student-t density with location $m$ is
 
-$$
+```math
 f(r;m,\sigma,\nu)=
 \frac{\Gamma((\nu+1)/2)}{\Gamma(\nu/2)\sqrt{\nu\pi}\,\sigma}
 \left(1+\frac{(r-m)^2}{\nu\sigma^2}\right)^{-(\nu+1)/2}.
-$$
+```
 
-**Scale is not standard deviation.** For $\nu>2$,
+The scale parameter determines the standard deviation. For $\nu>2$,
 $\operatorname{sd}(r)=\sigma\sqrt{\nu/(\nu-2)}$.
 The heavy tails allow occasional extreme returns without treating each one as
 conclusive evidence of a mean change.
@@ -121,20 +120,17 @@ finite-grid approximation to a continuous maximum-likelihood fit.
 
 Define evidence in favor of the broken model by
 
-$$
+```math
 \ell_t=\log\frac{f(r_t;\mu_b,\sigma,\nu)}{f(r_t;\mu,\sigma,\nu)}.
-$$
+```
 
 The common normalization cancels, giving
 
-$$
-\ell_t=\frac{\nu+1}{2}
-\left[
-\log\left(1+\frac{(r_t-\mu)^2}{\nu\sigma^2}\right)
--
-\log\left(1+\frac{(r_t-\mu_b)^2}{\nu\sigma^2}\right)
-\right].
-$$
+```math
+\ell_t=\frac{\nu+1}{2}\log
+\frac{1+(r_t-\mu)^2/(\nu\sigma^2)}
+{1+(r_t-\mu_b)^2/(\nu\sigma^2)}.
+```
 
 Positive evidence favors deterioration; negative evidence favors the healthy
 model. `log_likelihood_ratio()` subtracts Student-t log densities to avoid
@@ -142,28 +138,30 @@ forming a potentially unstable ratio of small probabilities.
 
 For fixed correct models with independent observations,
 
-$$
-\mathbb E_0[\ell_t]=-D_{\mathrm{KL}}(f_0\Vert f_1)\leq0,
-\qquad
-\mathbb E_1[\ell_t]=D_{\mathrm{KL}}(f_1\Vert f_0)\geq0.
-$$
+```math
+\mathbb E_0[\ell_t]=-D_{\mathrm{KL}}(f_0\Vert f_1)\leq0.
+```
 
-This explains the desired drift direction; it is not a guarantee for fitted,
-misspecified, or dependent real-world returns.
+```math
+\mathbb E_1[\ell_t]=D_{\mathrm{KL}}(f_1\Vert f_0)\geq0.
+```
+
+Thus the statistic tends downward under the healthy model and upward under
+the broken model.
 
 ## 3. CUSUM recurrence and alarm
 
 Start with $S_0=0$ and update
 
-$$
+```math
 S_t=\max(0,S_{t-1}+\ell_t).
-$$
+```
 
 Equivalently,
 
-$$
+```math
 S_t=\max\left(0,\max_{1\leq j\leq t}\sum_{i=j}^{t}\ell_i\right).
-$$
+```
 
 For conditionally independent observations, each suffix sum is the log
 likelihood ratio for a change beginning at $j$. CUSUM retains the strongest
@@ -172,13 +170,13 @@ long healthy history from creating a large negative balance that must be repaid.
 
 An alarm occurs at
 
-$$
+```math
 \tau_c=\inf\{t\geq1:S_t>c\}.
-$$
+```
 
 The **strict inequality** matches Killswitch. With $c=2$, a statistic of exactly
-2 does not fire. The threshold is measured in natural-log evidence units;
-$S_t$ is **not a probability**.
+2 does not fire. Both the statistic $S_t$ and its threshold are measured in
+natural-log evidence units.
 
 For daily evidence $[1,-0.5,-1,2]$:
 
@@ -190,8 +188,7 @@ For daily evidence $[1,-0.5,-1,2]$:
 | 4 | 2.0 | 2.0 |
 
 A larger threshold generally trades fewer false alarms for slower detection.
-There is no additional reference-drift parameter here: the specified healthy
-and broken models already determine the log-likelihood increments.
+The specified healthy and broken models determine the log-likelihood increments.
 
 ## 4. Threshold selection and operational policy
 
@@ -208,18 +205,21 @@ particular false-alarm probability. This extraction retains that procedure:
 For the demo, simulation parameters are $\mu=0.0015$, $\sigma=0.008$, and $\nu=4$.
 The original real-data pipeline instead simulates from the observed warm-up
 fit and matches the monitoring horizon. The standalone demo reproduces the
-synthetic case; it does not include the web interface or real-data pipeline.
+synthetic case. The [original Killswitch project](https://github.com/leilei67/Killswitch)
+contains the web interface and real-data pipeline.
 
 Let $a_t^{(c)}$ indicate whether the rule trades on day $t$, and let $b$ be the
 true simulated break day. Using **additive** return accounting from day 250,
 
-$$
+```math
 R(c)=\sum_{t=250}^{T-1}r_t\,\mathbf 1\{t<b\}
--\sum_{t=250}^{T-1}r_t\,a_t^{(c)},
-\qquad
+-\sum_{t=250}^{T-1}r_t\,a_t^{(c)}.
+```
+
+```math
 \widehat c=\operatorname*{arg\,min}_{c\in\mathcal C}
 \frac1N\sum_{n=1}^N R_n(c).
-$$
+```
 
 The oracle stops at the true break. The rule observes the return at the close,
 so it **trades on the alarm day**, sits out the following 60 days, and restarts
@@ -236,35 +236,33 @@ simulator evaluates CUSUM as its own stop-and-restart rule.
 False kills count strategies with at least one alarm before their true break
 (including healthy strategies). Missed breaks count broken strategies with no
 alarm on or after the break. Delay averages the first post-break alarm's delay
-across detected strategies only. Report all these alongside regret: a low
-regret alone does not imply a low false-alarm rate.
+across detected strategies only. Together these metrics describe the trade-off
+between false alarms, missed breaks, detection speed, and trading performance.
 
 ## Files and verification
 
 | File | Purpose |
 |---|---|
-| `core/detectors.py` | CUSUM recurrence, strict alarm comparison, batched series |
-| `core/model.py` | Student-t fitting and daily log-likelihood ratio |
-| `core/sim.py` | Healthy, sudden-break, and decay simulation |
-| `core/evaluate.py` | Stop/restart execution, regret metrics, grid tuning |
-| `core/demo.py` | Reproducible CUSUM-only training/test demonstration |
-| `tests/` | Mathematical identities, model fitting, simulations, restart timing |
-| `ATTRIBUTION.md` | Team credit and exact upstream provenance |
+| [core/detectors.py](core/detectors.py) | CUSUM recurrence, strict alarm comparison, batched series |
+| [core/model.py](core/model.py) | Student-t fitting and daily log-likelihood ratio |
+| [core/sim.py](core/sim.py) | Healthy, sudden-break, and decay simulation |
+| [core/evaluate.py](core/evaluate.py) | Stop/restart execution, regret metrics, grid tuning |
+| [core/demo.py](core/demo.py) | Reproducible CUSUM-only training/test demonstration |
+| [tests/](tests/) | Mathematical identities, model fitting, simulations, restart timing |
+| [ATTRIBUTION.md](ATTRIBUTION.md) | Team credit and exact upstream provenance |
 
 The tests compare the recurrence with the maximum-suffix formula, compare daily
 evidence with independent SciPy densities and the closed form above, check
 strict threshold behavior and 60-day restarts, and retain upstream model and
 simulation tests. The lockfile records the dependency versions used here.
 
-## Scope and limitations
+## Model assumptions
 
-The initial 250 days are assumed representative of a healthy strategy. A
-positive fitted mean alone does not establish that a profitable edge exists.
-The alternative fixes a particular negative mean with unchanged scale and tail
-shape; it does not explicitly detect volatility changes. Dependence, parameter
-uncertainty, a different type of deterioration, or a different trading horizon
-can change detector behavior and threshold performance. This demo's threshold
-is specific to its simulation and objective, not a universal trading rule.
+The baseline uses the first 250 days as a representative healthy period with a
+positive fitted mean. The alternative models deterioration as a change to a
+negative mean, keeping the Student-t scale and tail shape fixed. Likelihoods
+use independent daily observations with fixed fitted parameters. The threshold
+is selected for the simulation horizon and regret objective described above.
 
 ## Team and source
 
