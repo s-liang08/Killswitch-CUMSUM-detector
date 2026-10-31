@@ -1,0 +1,13 @@
+[project]
+name = "killswitch-cusum"
+version = "0.1.0"
+description = "CUSUM detector and mathematical walkthrough from the team Killswitch project"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "scipy>=1.11"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
